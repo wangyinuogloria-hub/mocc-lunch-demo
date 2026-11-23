@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#173e34">
+<meta name="description" content="Explore the hidden journey of a canteen lunch. An interactive student exhibition prototype for MoCC.">
+<title>The Journey of Your Lunch</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+ <a class="wordmark" href="#start" aria-label="Lunch Journey home"><span class="brand-mark" aria-hidden="true"></span>Lunch Journey<span class="brand-sub">A MoCC student proposal</span></a>
+ <nav aria-label="Your food journey"><a href="#ingredients" data-nav="ingredients">Your meal</a><a href="#journey" data-nav="journey">Its journey</a><a href="#reflect" data-nav="reflect">Your next meal</a></nav>
+ <div class="utilities"><button id="fullscreen" class="icon-button" aria-label="Enter full screen" title="Full screen">⛶</button><button id="reset" class="text-button">Start again</button></div>
+</header>
+<main id="app" tabindex="-1"></main>
+<footer class="site-footer"><span>Interactive prototype <span class="footer-sep">·</span> Simulated AI recognition</span><span>CCM3203 <span class="footer-sep">/</span> AI-supported museum experiences</span></footer>
+<dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2><button id="close-dialog" class="close-button" aria-label="Close dialog">×</button></div><div id="dialog-content"></div></dialog>
+<input type="file" id="photo-file" accept="image/*" hidden>
+<div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body></html>
