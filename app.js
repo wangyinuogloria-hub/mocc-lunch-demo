@@ -1,13 +1,12 @@
 'use strict';
 const app = document.querySelector('#app');
 const dialog = document.querySelector('#dialog');
-const fileInput = document.querySelector('#photo-file');
 const defaults = () => [
   { name: 'Chinese cabbage', type: 'vegetable', note: 'Leafy vegetable · confirm the variety' },
   { name: 'Braised pork', type: 'pork', note: 'Pork dish · confirm the ingredient' },
   { name: 'Pork tenderloin', type: 'pork', note: 'Fried dish · confirm the ingredient' }
 ];
-const state = { ingredients: defaults(), selected: 1, confirmed: false, customPhoto: null, response: '', quiz: null };
+const state = { ingredients: defaults(), selected: 1, confirmed: false, response: '', quiz: null };
 const sources = [
   { title: 'Energy in agrifood systems', org: 'FAO', url: 'https://www.fao.org/energy/en/', supports: 'Energy use across production, processing, transport, storage and preparation.' },
   { title: 'Sustainable Food Cold Chains', org: 'UNEP & FAO · 2022', url: 'https://wedocs.unep.org/items/c53a122d-d424-48a3-8cd6-9fddc3cf0dc2', supports: 'Refrigeration, its environmental impacts and its role in reducing food loss.' },
@@ -70,16 +69,16 @@ function actionButton(action, label, cls = 'primary', extra = '') {
 }
 function selectedIngredient() { return state.ingredients[state.selected] || state.ingredients[0]; }
 function photo(classes = '', pins = false) {
-  return `<div class="photo ${classes} ${state.customPhoto ? 'custom' : ''}" role="img" aria-label="${escapeHTML(state.customPhoto ? 'Your selected meal photo' : 'Canteen meal with cabbage and two pork dishes')}">${pins && !state.customPhoto ? state.ingredients.map((item, i) => `<button class="ingredient-pin pin-${i}" data-action="edit" data-index="${i}" aria-label="Edit ${escapeHTML(item.name)}">${escapeHTML(item.name)}</button>`).join('') : ''}</div>`;
+  return `<div class="photo ${classes}" role="img" aria-label="Canteen meal with cabbage and two pork dishes">${pins ? state.ingredients.map((item, i) => `<button class="ingredient-pin pin-${i}" data-action="edit" data-index="${i}" aria-label="Edit ${escapeHTML(item.name)}">${escapeHTML(item.name)}</button>`).join('') : ''}</div>`;
 }
 function head(eyebrow, title, subtitle, hint = '') {
   return `<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p>${subtitle}</p></div>${hint ? `<span class="step-hint">${hint}</span>` : ''}</div>`;
 }
 function startScreen() {
-  return `<section class="hero fade-in"><div class="hero-copy"><p class="eyebrow">From a familiar meal to a bigger picture</p><h1>Your lunch,<br><span class="accent-word">uncovered.</span></h1><p class="intro">A meal is more than what’s on the plate. Follow an ingredient and discover the energy behind its journey.</p><div class="buttons">${actionButton('sample', 'Explore this lunch')}${actionButton('upload', 'Choose a photo', 'secondary')}</div><p class="fine">Try the prepared canteen meal, or use your own photo and identify its ingredients. Photos stay in this browser tab.</p></div><div class="hero-media">${photo()}<div class="photo-caption"><span>A real canteen lunch. A starting point for questions.</span><span class="caption-tag">Your everyday, connected.</span></div></div></section>`;
+  return `<section class="hero fade-in"><div class="hero-copy"><p class="eyebrow">From a familiar meal to a bigger picture</p><h1>Your lunch,<br><span class="accent-word">uncovered.</span></h1><p class="intro">A meal is more than what’s on the plate. Follow an ingredient and discover the energy behind its journey.</p><div class="buttons">${actionButton('sample', 'Explore this lunch')}${actionButton('upload-preview', 'Choose a photo', 'secondary', 'disabled title="Photo upload is shown as part of the prototype"')}</div><p class="fine">Explore the prepared canteen meal. Photo upload is preview-only in this demonstration.</p></div><div class="hero-media">${photo()}<div class="photo-caption"><span>A real canteen lunch. A starting point for questions.</span><span class="caption-tag">Your everyday, connected.</span></div></div></section>`;
 }
 function ingredientsScreen() {
-  return `<section class="fade-in">${head('Your meal', 'What’s on your plate?', 'Confirm the ingredients before following their journey.', 'You choose what to explore')}<div class="recognition"><div class="photo-panel">${photo('', true)}<p class="fine">${state.customPhoto ? 'Your photo · use Edit to identify each ingredient manually.' : 'Prepared example · the labels below are simulated recognition suggestions.'}</p></div><div><p class="section-label">${state.confirmed ? 'Your confirmed ingredients' : 'Ingredients to confirm'}</p><ul class="ingredient-list">${state.ingredients.map((item, i) => `<li class="ingredient-item"><span class="swatch ${item.type}" aria-hidden="true"></span><div class="ingredient-name">${escapeHTML(item.name)}<small>${escapeHTML(state.confirmed ? 'Confirmed by you' : item.note)}</small></div>${actionButton('edit', 'Edit', 'edit-button', `data-index="${i}"`)}</li>`).join('')}</ul><p class="notice">Mixed dishes can be difficult to identify. You can correct a name and choose its ingredient group.</p>${actionButton('confirm', 'Confirm ingredients')}<div class="buttons">${actionButton('upload', 'Change photo', 'text-button')}${actionButton('sample', 'Use the prepared meal', 'text-button')}</div></div></div></section>`;
+  return `<section class="fade-in">${head('Your meal', 'What’s on your plate?', 'Confirm the ingredients before following their journey.', 'You choose what to explore')}<div class="recognition"><div class="photo-panel">${photo('', true)}<p class="fine">Prepared example · the labels below are simulated recognition suggestions.</p></div><div><p class="section-label">${state.confirmed ? 'Your confirmed ingredients' : 'Ingredients to confirm'}</p><ul class="ingredient-list">${state.ingredients.map((item, i) => `<li class="ingredient-item"><span class="swatch ${item.type}" aria-hidden="true"></span><div class="ingredient-name">${escapeHTML(item.name)}<small>${escapeHTML(state.confirmed ? 'Confirmed by you' : item.note)}</small></div>${actionButton('edit', 'Edit', 'edit-button', `data-index="${i}"`)}</li>`).join('')}</ul><p class="notice">Mixed dishes can be difficult to identify. You can correct a name and choose its ingredient group.</p>${actionButton('confirm', 'Confirm ingredients')}<div class="buttons">${actionButton('upload-preview', 'Change photo', 'text-button', 'disabled title="Preview only"')}${actionButton('sample', 'Use the prepared meal', 'text-button')}</div></div></div></section>`;
 }
 function journeyScreen() {
   const chosen = selectedIngredient();
@@ -127,7 +126,6 @@ function render() {
   else if (route === 'process/transport') html = transportScreen();
   else html = genericStageScreen(route.split('/')[1]);
   app.innerHTML = html;
-  if (state.customPhoto) app.querySelectorAll('.photo').forEach(el => { el.style.backgroundImage = `url("${state.customPhoto}")`; });
   document.querySelectorAll('nav a').forEach(el => {
     const active = route.startsWith('process/') ? el.dataset.nav === 'journey' : el.dataset.nav === route;
     el.classList.toggle('active', active);
@@ -164,10 +162,8 @@ function showCuration() {
   openDialog('How this explanation was selected', `<div class="modal-body"><p><strong>Hybrid curatorship</strong> connects institutional knowledge, AI support and visitor choice.</p><h3>Museum staff</h3><p>In the proposed installation, educators select reliable sources, write the knowledge cards and review their scope and accuracy.</p><h3>AI support</h3><p>The proposed AI suggests ingredients and connects the visitor’s confirmed choice to relevant cards. This demo uses preset labels and matching rules.</p><h3>You</h3><p>You correct the ingredient, choose a group and decide which stage to open.</p><h3>When information is missing</h3><p>The screen marks what is still unknown. Further external research would need checking before becoming a museum explanation.</p><p class="fine">Student proposal for the MoCC permanent exhibition. The prototype content has been prepared by the student project, with the sources linked here.</p></div>`);
 }
 function reset() {
-  if (state.customPhoto) URL.revokeObjectURL(state.customPhoto);
-  Object.assign(state, { ingredients: defaults(), selected: 1, confirmed: false, customPhoto: null, response: '', quiz: null });
+  Object.assign(state, { ingredients: defaults(), selected: 1, confirmed: false, response: '', quiz: null });
   if (dialog.open) dialog.close();
-  fileInput.value = '';
   navigate('start');
 }
 function saveResponse() {
@@ -181,8 +177,7 @@ function saveResponse() {
   announce('Reflection kept in this tab.');
 }
 const actions = {
-  sample: () => { if(dialog.open)dialog.close(); if(state.customPhoto) URL.revokeObjectURL(state.customPhoto); Object.assign(state,{ingredients:defaults(),selected:1,confirmed:false,customPhoto:null}); navigate('ingredients'); },
-  upload: () => fileInput.click(),
+  sample: () => { if(dialog.open)dialog.close(); Object.assign(state,{ingredients:defaults(),selected:1,confirmed:false}); navigate('ingredients'); },
   edit: el => editIngredient(Number(el.dataset.index)),
   confirm: () => { state.confirmed=true; navigate('journey'); },
   'select-ingredient': el => { state.selected=Number(el.dataset.index); render(); },
@@ -212,29 +207,6 @@ document.querySelector('#fullscreen').addEventListener('click',async()=>{
     else announce('Use your browser full-screen command.');
   } catch { announce('Use your browser full-screen command.'); }
 });
-fileInput.addEventListener('change',async()=>{
-  const file=fileInput.files[0];
-  fileInput.value='';
-  if(!file)return;
-  if(!file.type.startsWith('image/') || file.size>15*1024*1024){
-    openDialog('Choose a meal photo','<div class="modal-body"><p>Choose a JPG, PNG or another browser-readable image under 15 MB.</p><div class="buttons">'+actionButton('upload','Choose another photo')+actionButton('sample','Try the prepared meal','secondary')+'</div></div>');return;
-  }
-  const url=URL.createObjectURL(file);
-  const check=new Image();
-  check.src=url;
-  try { await check.decode(); }
-  catch { URL.revokeObjectURL(url);openDialog('We couldn’t open that image','<div class="modal-body"><p>Try a JPG or PNG, or use the prepared meal.</p>'+actionButton('upload','Choose another photo')+'</div>');return; }
-  if(state.customPhoto)URL.revokeObjectURL(state.customPhoto);
-  state.customPhoto=url;
-  state.confirmed=false;
-  state.ingredients=[{name:'Ingredient 1',type:'other',note:'Choose a name and group'},{name:'Ingredient 2',type:'other',note:'Choose a name and group'},{name:'Ingredient 3',type:'other',note:'Choose a name and group'}];
-  state.selected=0;
-  if(dialog.open)dialog.close();
-  navigate('ingredients');
-  announce('Your photo is ready. Use Edit to identify its ingredients manually.');
-});
-actions.close=()=>dialog.close();
 window.addEventListener('hashchange',()=>{ if(dialog.open)dialog.close(); render(); });
 document.addEventListener('input',event=>{if(event.target.id==='response')state.response=event.target.value;});
-window.addEventListener('beforeunload',()=>{if(state.customPhoto)URL.revokeObjectURL(state.customPhoto);});
 render();
