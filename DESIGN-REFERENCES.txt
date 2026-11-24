@@ -1,0 +1,9 @@
+Apple-inspired UI references (2026-11-24)
+
+KanishkRanjan/apple-design-skill — product UI principles and translated design tokens
+https://github.com/KanishkRanjan/apple-design-skill
+Apple Human Interface Guidelines — primary design reference
+https://developer.apple.com/design/human-interface-guidelines/
+
+Uses local system fonts, original inline line icons, and the project's green accent.
+No Apple fonts, SF Symbols, logos or externally loaded UI libraries are distributed.

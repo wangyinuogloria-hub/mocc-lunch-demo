@@ -1,12 +1,4 @@
 'use strict';
-const app = document.querySelector('#app');
-const dialog = document.querySelector('#dialog');
-const defaults = () => [
-  { name: 'Chinese cabbage', type: 'vegetable', note: 'Leafy vegetable · confirm the variety' },
-  { name: 'Braised pork', type: 'pork', note: 'Pork dish · confirm the ingredient' },
-  { name: 'Pork tenderloin', type: 'pork', note: 'Fried dish · confirm the ingredient' }
-];
-const state = { ingredients: defaults(), selected: 1, confirmed: false, response: '', quiz: null, region: null };
 const sources = [
   {
     "id": "R1",
@@ -57,13 +49,6 @@ const sources = [
     "url": "https://wedocs.unep.org/items/c53a122d-d424-48a3-8cd6-9fddc3cf0dc2",
     "supports": "Explains refrigeration energy, environmental impacts and reducing food loss. It does not establish whether this lunch used chilled or frozen delivery."
   }
-];
-const stages = [
-  { id: 'production', title: 'Production', art: '♧', caption: 'Where ingredients begin' },
-  { id: 'processing', title: 'Processing', art: '▥', caption: 'Preparing and packing' },
-  { id: 'transport', title: 'Transportation', art: '▰', caption: 'Moving food between places' },
-  { id: 'distribution', title: 'Distribution', art: '▤', caption: 'Storing and supplying' },
-  { id: 'cooking', title: 'Cooking', art: '≈', caption: 'Preparing your meal' }
 ];
 const regionalStages = {
   "production": {
@@ -395,191 +380,204 @@ const regionalStages = {
     }
   }
 };
-function regionalContent(id) {
-  const item = selectedIngredient();
-  const base = regionalStages[id];
-  let variant = item.type === 'vegetable' ? 'vegetable' : 'pork';
-  if (id === 'cooking' && item.type === 'pork' && /tenderloin|fried|里脊|炸/i.test(item.name)) variant = 'fried';
-  if (!['pork', 'vegetable'].includes(item.type)) return {
-    title: 'A different ingredient needs a different trail.',
-    intro: 'The region is still Zhuhai. This ingredient is outside the prepared pork-and-cabbage case.',
-    label: 'Manual ingredient · no matched regional card',
-    route: ['Origin unconfirmed', 'Supplier unconfirmed', 'BNBU canteen'],
-    summary: 'Changing an ingredient must not keep an explanation about the wrong food.',
-    panels: [['What can we say?', 'You selected '+escapeHTML(item.name)+'. This demo has detailed Zhuhai cards for pork and leafy vegetables. It has no verified local supply pathway for this ingredient.'], ['What would be needed?', 'A curator would need an ingredient-specific source and supplier or kitchen records before preparing a detailed card. The region selector cannot fill that gap.']],
-    unknown: ['Ingredient-specific sources', 'Supplier / origin', 'Kitchen preparation']
-  };
-  return {...base, ...base[variant]};
+const app = document.querySelector('#app');
+const dialog = document.querySelector('#dialog');
+const defaults = () => [
+  { name:'Chinese cabbage', type:'vegetable' },
+  { name:'Braised pork', type:'pork' },
+  { name:'Pork tenderloin', type:'pork' }
+];
+const state = { ingredients:defaults(), selected:1, confirmed:false, photoSelected:false, galleryChoice:false, region:null, placeName:'', response:'', quiz:null };
+const locations = {
+  China: {
+    Guangdong:['Zhuhai','Guangzhou','Shenzhen','Zhongshan','Jiangmen','Foshan','Dongguan','Huizhou'],
+    Beijing:['Beijing'], Shanghai:['Shanghai'], Fujian:['Fuzhou','Xiamen'], Guangxi:['Nanning','Guilin'], Hunan:['Changsha']
+  },
+  Japan:{Tokyo:['Tokyo'],Osaka:['Osaka'],Kyoto:['Kyoto']},
+  'United Kingdom':{England:['London','Manchester'],Scotland:['Edinburgh','Glasgow']},
+  'United States':{California:['Los Angeles','San Francisco'],'New York':['New York City']}
+};
+const stages = [
+  {id:'production',title:'Production',icon:'sprout',caption:'On the farm'},
+  {id:'processing',title:'Processing',icon:'box',caption:'Before delivery'},
+  {id:'transport',title:'Transport',icon:'truck',caption:'On the move'},
+  {id:'distribution',title:'Storage',icon:'warehouse',caption:'Before the kitchen'},
+  {id:'cooking',title:'Cooking',icon:'flame',caption:'Into your meal'}
+];
+const shortStages = {
+  production:{
+    pork:{title:'Before it reaches {place}.',route:['Feed crops','Pig farm','Zhuhai market'],facts:[['Local production','Doumen has a documented pig-farming example.'],['Before the farm','Feed crops, milling and delivery also use resources.'],['Farm energy','Housing, water pumping and manure handling matter.']]},
+    vegetable:{title:'Where could this cabbage begin?',route:['Growing area','Harvest & sorting','Zhuhai supplier'],facts:[['Local growing areas','Doumen and Jinwan are local production districts.'],['Other origins','Zhuhai also connects with outside-city supply bases.'],['Growing resources','Irrigation, fertiliser and harvesting all deserve a closer look.']]}
+  },
+  processing:{
+    pork:{title:'Before the pork reaches {place}.',route:['Slaughter & cutting','Raw or prepared?','Chilled or frozen?'],facts:[['Local processing','Zhuhai has documented slaughter and meat-processing facilities.'],['Two product forms','Raw cuts and prepared strips follow different processing paths.'],['Hidden energy','Cutting, packing and cold storage happen before cooking.']]},
+    vegetable:{title:'Whole cabbage, or ready to cook?',route:['Sort & trim','Pack for delivery','Wash & cut'],facts:[['Preparation','Cabbage may arrive whole or already trimmed.'],['Materials','Crates, packaging and washing have their own resource costs.'],['Where it happens','Trimming upstream changes where leaves and waste are handled.']]}
+  },
+  transport:{
+    pork:{title:'Getting to {place}.',route:['Farm & processor','Zhuhai supplier','{place}'],facts:[['Delivery','Distance, vehicle and shared loads matter.'],['Cooling','Chilled pork may need refrigerated delivery.'],['Before arrival','The supplier’s address may differ from the farm.']]},
+    vegetable:{title:'Getting to {place}.',route:['Growing region','Zhuhai supplier','{place}'],facts:[['Two routes','Local and outside-city farms can supply the same kitchen.'],['On the road','Crates, travel time and shared loads affect the journey.'],['Cooling & loss','Cooling uses energy, but may also prevent spoilage.']]}
+  },
+  distribution:{
+    pork:{title:'Before cooking at {place}.',route:['Supplier depot','Receiving','Kitchen storage'],facts:[['A local example','Xiangzhou has a documented food-logistics and storage centre.'],['On arrival','Supplier, batch and delivery condition need checking.'],['While it waits','Cold-storage time and unused stock affect resource use.']]},
+    vegetable:{title:'Keeping cabbage ready at {place}.',route:['Produce supplier','Receiving','Storage or preparation'],facts:[['Wholesale supply','A wholesaler may combine produce from several farms.'],['Freshness','Time and storage conditions affect usable cabbage.'],['Less wasted','Compare the amount received, prepared and discarded.']]}
+  },
+  cooking:{
+    pork:{title:'Braising at {place}.',route:['Cut & prepare','Brown & simmer','Portion & serve'],facts:[['Cooking path','Braising typically combines initial heating with simmering.'],['Per portion','Equipment, cooking time and batch size matter together.'],['After cooking','Hot holding and uneaten portions add to the picture.']]},
+    fried:{title:'Frying at {place}.',route:['Prepare strips','Heat oil & fry','Portion & serve'],facts:[['Before frying','Strips may be prepared on site or supplied ready-coated.'],['Cooking energy','Heating oil and keeping equipment running require energy.'],['Per portion','Batch size, hot holding and leftovers affect the result.']]},
+    vegetable:{title:'Cooking cabbage at {place}.',route:['Trim, wash & cut','Cook a batch','Portion & serve'],facts:[['Preparation','Washing uses water; trimming creates leaves to manage.'],['Cooking energy','Heat, ventilation and possible hot holding use energy.'],['Food actually eaten','Batch planning and portion size can reduce wasted resources.']]}
+  }
+};
+const paths = {
+  leaf:'M20 4c0 9-3 15-10 15a6 6 0 0 1-6-6C4 6 11 4 20 4ZM5 20 16 9',
+  plus:'M12 5v14M5 12h14', check:'m5 12 4 4L19 6', close:'m6 6 12 12M18 6 6 18',
+  expand:'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5',
+  pin:'M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0ZM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
+  chevron:'m9 5 7 7-7 7',
+  sprout:'M12 21v-9M12 15C4 15 3 10 3 6c6 0 9 3 9 9ZM12 12c0-6 4-9 9-9 0 5-3 9-9 9',
+  box:'m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10M7 5l10 4',
+  truck:'M3 5h12v12H3V5ZM15 9h4l3 4v4h-7M7 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM18 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4',
+  warehouse:'m3 9 9-6 9 6v12H3V9ZM7 21V11h10v10M7 15h10M7 18h10',
+  flame:'M13 3c1 5-4 6-4 10 0 1 1 2 2 3-4-1-5-4-4-6-5 5-3 11 4 11s10-7 5-12c0 3-1 4-2 5 1-5 0-8-1-11',
+  info:'M12 11v6M12 7h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
+};
+function icon(name) { return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.leaf}"/></svg>`; }
+function escapeHTML(value) { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function place() { return escapeHTML(state.placeName || 'your destination'); }
+function withPlace(text) { return String(text).replaceAll('{place}',()=>place()); }
+function localize(text) {
+  return String(text).replace(/BNBU canteen|BNBU kitchen|BNBU lunch|BNBU/gi,()=>place()).replace(/Tangjiawan/gi,'Zhuhai');
 }
-
-function escapeHTML(value) {
-  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+function button(action,label,cls='primary',attributes='') { return `<button class="${cls}" data-action="${action}" ${attributes}>${label}</button>`; }
+function photo(cls='',pins=false) {
+  return `<div class="photo ${cls}" role="img" aria-label="Lunch with Chinese cabbage, braised pork and pork tenderloin">${pins?state.ingredients.map((item,i)=>button('edit',escapeHTML(item.name),`ingredient-pin pin-${i}`,`data-index="${i}" aria-label="Edit ${escapeHTML(item.name)}"`)).join(''):''}</div>`;
 }
-function actionButton(action, label, cls = 'primary', extra = '') {
-  return `<button class="${cls}" data-action="${action}" ${extra}>${label}</button>`;
-}
+function head(kicker,title,subtitle='') { return `<div class="page-head"><p class="eyebrow">${kicker}</p><h1>${title}</h1>${subtitle?`<p class="subtitle">${subtitle}</p>`:''}</div>`; }
 function selectedIngredient() { return state.ingredients[state.selected] || state.ingredients[0]; }
-function photo(classes = '', pins = false) {
-  return `<div class="photo ${classes}" role="img" aria-label="Canteen meal with cabbage and two pork dishes">${pins ? state.ingredients.map((item, i) => `<button class="ingredient-pin pin-${i}" data-action="edit" data-index="${i}" aria-label="Edit ${escapeHTML(item.name)}">${escapeHTML(item.name)}</button>`).join('') : ''}</div>`;
+function variant(id) {
+  const item=selectedIngredient();
+  if(!['pork','vegetable'].includes(item.type)) return 'unsupported';
+  return id==='cooking' && item.type==='pork' && /tenderloin|fried|里脊|炸/i.test(item.name)?'fried':item.type;
 }
-function head(eyebrow, title, subtitle, hint = '') {
-  return `<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p>${subtitle}</p></div>${hint ? `<span class="step-hint">${hint}</span>` : ''}</div>`;
-}
-function startScreen() {
-  return `<section class="hero fade-in"><div class="hero-copy"><p class="eyebrow">From a familiar meal to a bigger picture</p><h1>Your lunch,<br><span class="accent-word">uncovered.</span></h1><p class="intro">Start with a BNBU canteen lunch in Zhuhai. Follow an ingredient and discover the energy behind its journey.</p><div class="buttons">${actionButton('sample', 'Explore this lunch')}${actionButton('choose-photo', 'Choose a photo', 'secondary')}</div><p class="fine">Choose the prepared lunch photo, then set your region. No upload or live AI is needed.</p></div><div class="hero-media">${photo()}<div class="photo-caption"><span>BNBU canteen lunch · Zhuhai</span><span class="caption-tag">Your everyday, connected.</span></div></div></section>`;
-}
-function choosePhoto() {
-  openDialog('Choose a photo', `<p class="picker-intro">Start with a meal you know. Select the prepared photo to continue.</p><button class="meal-choice" data-action="sample" aria-label="Select the BNBU braised-pork lunch">${photo()}<span class="meal-choice-label"><strong>My BNBU canteen lunch</strong><small>Braised pork · pork tenderloin · cabbage</small><span class="choose-arrow" aria-hidden="true">→</span></span></button><div class="upload-placeholder"><div><strong>Analyse a new photo</strong><small>Bring another meal into the experience.</small></div><button class="secondary" disabled title="Visual preview only; this demo uses the prepared meal">Upload a photo</button></div><p class="fine">New-photo analysis is a preview-only feature. The prepared meal is fully clickable.</p>`);
-}
-function chooseRegion() {
-  openDialog('Where are you eating?', `<p class="picker-intro">Add the place, then look beyond the plate.</p><div class="region-meal">${photo('meal-thumb')}<div><strong>My BNBU canteen lunch</strong><small>Your selected photo</small></div></div><form id="region-form"><label class="editor-label" for="region-choice">Select a region</label><select class="editor-input" id="region-choice" required><option value="">Choose your region…</option><option value="Zhuhai">Zhuhai · 珠海</option><option disabled>Other regions · not included in this demo</option></select><div class="region-preview"><span class="section-label">Prepared regional experience</span><strong>Zhuhai → Tangjiawan → BNBU canteen</strong><p>Explore pork and vegetable supply, delivery, storage and cooking in a local canteen scenario.</p></div><p class="fine">The region selects prepared explanations. It does not identify a farm or track an actual shipment.</p><div class="modal-actions"><button class="primary" id="region-continue" type="submit" disabled>Continue with Zhuhai</button></div></form>`);
-  const select = document.querySelector('#region-choice');
-  select.addEventListener('change', () => { document.querySelector('#region-continue').disabled = select.value !== 'Zhuhai'; });
-  document.querySelector('#region-form').addEventListener('submit', event => {
-    event.preventDefault();
-    if (select.value !== 'Zhuhai') return;
-    Object.assign(state, {region:'Zhuhai', ingredients:defaults(), selected:1, confirmed:false, response:'', quiz:null});
-    dialog.close(); navigate('ingredients');
-  });
+function shortContent(id) {
+  const v=variant(id);
+  return v==='unsupported'?{title:'A new ingredient needs a new trail.',route:['Origin unknown','Supplier unknown','{place}'],facts:[['Your correction',escapeHTML(selectedIngredient().name)+' needs a different ingredient card.'],['Available examples','This demo covers pork and leafy vegetables.'],['Next evidence','Ingredient-specific sources and supplier records would be needed.']]}:shortStages[id][v];
 }
 function regionContext() {
-  return `<div class="region-context"><span class="context-location">Zhuhai <span>珠海</span></span><span>BNBU canteen · Tangjiawan</span><span class="context-scope">Regional scenario · actual suppliers unverified</span></div>`;
+  return `<div class="region-context"><button class="place-button" data-action="edit-place" aria-label="Edit place">${icon('pin')}<strong>${place()}</strong></button><span>${escapeHTML(state.region.city)}, ${escapeHTML(state.region.province)}, ${escapeHTML(state.region.country)}</span></div>`;
 }
-
+function startScreen() {
+  return `<section class="hero fade-in"><div class="hero-emblem" aria-hidden="true">${icon('leaf')}</div><h1>Your lunch.<br><span>A bigger story.</span></h1><p>Explore the hidden journey behind your meal.</p>${button('choose-photo','Choose a photo')}<span class="hero-note">Food. Energy. Everyday life.</span></section>`;
+}
+function openDialog(title,html,kind='') {
+  if(!dialog.open) dialog.returnFocus=document.activeElement;
+  dialog.className=kind;
+  document.querySelector('#dialog-title').textContent=title;
+  document.querySelector('#dialog-content').innerHTML=html;
+  if(!dialog.open) dialog.showModal();
+}
+function choosePhoto() {
+  state.galleryChoice=state.photoSelected||state.galleryChoice;
+  openDialog('Photos',`<div class="photo-grid" role="group" aria-label="Choose a meal photo"><button class="gallery-tile ${state.galleryChoice?'selected':''}" data-action="select-photo" aria-label="My lunch" aria-pressed="${state.galleryChoice}">${photo()}<span class="photo-check">${icon('check')}</span></button><button class="gallery-tile add-photo" disabled aria-label="Add photo, preview only" title="Preview only">${icon('plus')}</button></div><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}${button('photo-next','Next','primary',state.galleryChoice?'':'disabled')}</div>`,'photo-sheet');
+}
+function options(values,selected='',placeholder='Select') {
+  return `<option value="">${placeholder}</option>`+values.map(v=>`<option value="${escapeHTML(v)}" ${v===selected?'selected':''}>${escapeHTML(v)}</option>`).join('');
+}
+function chooseRegion(editing=false) {
+  const previous=editing?state.region:null;
+  openDialog('Where are you eating?',`<form id="region-form"><div class="location-fields"><div class="field"><label for="country-choice">Country / Region</label><select id="country-choice" required autocomplete="country-name">${options(Object.keys(locations),previous?.country,'Select country')}</select></div><div class="field"><label for="province-choice">Province / State</label><select id="province-choice" required autocomplete="address-level1" ${previous?'':'disabled'}>${options(previous?Object.keys(locations[previous.country]):[],previous?.province,'Select province')}</select></div><div class="field"><label for="city-choice">City</label><select id="city-choice" required autocomplete="address-level2" ${previous?'':'disabled'} aria-describedby="region-feedback">${options(previous?locations[previous.country][previous.province]:[],previous?.city,'Select city')}</select></div><div class="field"><label for="place-name">Place name</label><input id="place-name" maxlength="64" required value="${editing?escapeHTML(state.placeName):''}" placeholder="Name your canteen or place" autocomplete="off"></div></div><p id="region-feedback" class="form-feedback" role="status"></p><div class="sheet-actions">${button(editing?'close-dialog':'choose-photo',editing?'Cancel':'Back','text-button')}<button id="region-continue" class="primary" type="submit" ${editing?'':'disabled'}>${editing?'Save place':'Continue'}</button></div></form>`,'region-sheet');
+  const form=document.querySelector('#region-form');
+  const country=form.querySelector('#country-choice'), province=form.querySelector('#province-choice'),city=form.querySelector('#city-choice'), name=form.querySelector('#place-name');
+  const ready=()=>{
+    const complete=country.value&&province.value&&city.value&&name.value.trim();
+    form.querySelector('#region-continue').disabled=!complete;
+    form.querySelector('#region-feedback').textContent=city.value&&city.value!=='Zhuhai'?'Detailed local content is available for Zhuhai in this demo.':'';
+    city.removeAttribute('aria-invalid');
+  };
+  country.addEventListener('change',()=>{province.innerHTML=options(Object.keys(locations[country.value]||{}),'','Select province');province.disabled=!country.value;city.innerHTML=options([],'','Select city');city.disabled=true;ready();});
+  province.addEventListener('change',()=>{city.innerHTML=options(locations[country.value]?.[province.value]||[],'','Select city');city.disabled=!province.value;ready();});
+  city.addEventListener('change',ready);name.addEventListener('input',ready);
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(!country.value||!province.value||!city.value||!name.value.trim())return;
+    if(country.value!=='China'||province.value!=='Guangdong'||city.value!=='Zhuhai'){
+      form.querySelector('#region-feedback').textContent='Choose China, Guangdong and Zhuhai to use the local demo.';city.setAttribute('aria-invalid','true');city.focus();return;
+    }
+    if(!editing){state.ingredients=defaults();state.selected=1;state.confirmed=false;}
+    state.region={country:country.value,province:province.value,city:city.value};state.placeName=name.value.trim();state.photoSelected=true;
+    dialog.close();if(editing)render();else navigate('ingredients');
+  });
+}
 function ingredientsScreen() {
-  return `<section class="fade-in">${head('Your meal', 'What’s on your plate?', 'Confirm the ingredients before following their journey.', 'You choose what to explore')}<div class="recognition"><div class="photo-panel">${photo('', true)}<p class="fine">Prepared example · the labels below are simulated recognition suggestions.</p></div><div><p class="section-label">${state.confirmed ? 'Your confirmed ingredients' : 'Ingredients to confirm'}</p><ul class="ingredient-list">${state.ingredients.map((item, i) => `<li class="ingredient-item"><span class="swatch ${item.type}" aria-hidden="true"></span><div class="ingredient-name">${escapeHTML(item.name)}<small>${escapeHTML(state.confirmed ? 'Confirmed by you' : item.note)}</small></div>${actionButton('edit', 'Edit', 'edit-button', `data-index="${i}"`)}</li>`).join('')}</ul><p class="notice">Mixed dishes can be difficult to identify. You can correct a name and choose its ingredient group.</p>${actionButton('confirm', 'Confirm ingredients')}<div class="buttons">${actionButton('choose-photo', 'Change photo', 'text-button')}${actionButton('sample', 'Use the prepared meal', 'text-button')}</div></div></div></section>`;
+  return `<section class="fade-in">${head('Your meal',`Lunch at ${place()}.`,'Confirm what’s on your plate.')}<div class="recognition"><div class="photo-panel">${photo('',true)}</div><div class="ingredient-side"><p class="section-label">Ingredients</p><ul class="ingredient-list">${state.ingredients.map((item,i)=>`<li><span class="ingredient-name">${escapeHTML(item.name)}</span>${button('edit','Edit','text-button',`data-index="${i}" aria-label="Edit ${escapeHTML(item.name)} ingredient"`)}</li>`).join('')}</ul><p class="small-note">AI suggestions can be corrected.</p>${button('confirm','Confirm ingredients')}<div class="minor-action">${button('choose-photo','Change photo','text-button')}</div></div></div></section>`;
+}
+function ingredientTabs() {
+  return `<fieldset class="ingredient-tabs"><legend class="sr-only">Choose an ingredient</legend>${state.ingredients.map((item,i)=>`<label class="ingredient-tab"><input type="radio" name="ingredient" value="${i}" ${state.selected===i?'checked':''}><span>${escapeHTML(item.name)}</span></label>`).join('')}</fieldset>`;
 }
 function journeyScreen() {
-  const chosen = selectedIngredient();
-  return `<section class="fade-in">${actionButton('go-ingredients', 'Back to your ingredients', 'back')}${head('Its journey', 'A plate with a past.', 'Choose an ingredient, then open a stage to look closer.')}<div class="journey-context">${photo('meal-thumb')}<div class="ingredient-tabs" aria-label="Choose an ingredient">${state.ingredients.map((item, i) => actionButton('select-ingredient', escapeHTML(item.name), `ingredient-tab ${i === state.selected ? 'selected' : ''}`, `data-index="${i}" aria-pressed="${i === state.selected}"`)).join('')}</div></div><div class="journey-stage"><div class="journey-track">${stages.map(stage => `<button class="stage-card ${stage.id === 'transport' ? 'featured' : ''}" data-action="stage" data-stage="${stage.id}"><div class="stage-art" aria-hidden="true">${stage.art}</div><h3>${stage.title}</h3><p>${stage.id === 'production' ? productionCaption(chosen.type) : stage.caption}</p></button>`).join('')}</div><div class="journey-bottom"><span>A Zhuhai scenario for <strong>${escapeHTML(chosen.name)}</strong>. Transport can connect several stages.</span>${actionButton('sources', 'View sources', 'info-link')}</div></div><p class="fine">A prepared Zhuhai scenario, not a traced shipment. Open each stage for local context, ingredient details and questions for the canteen.</p></section>`;
-}
-function productionCaption(type) { return ({ vegetable: 'Growing and harvesting', pork: 'Raising pigs and producing feed', tofu: 'Growing soybeans', other: 'Producing the ingredient' })[type] || 'Producing the ingredient'; }
-function accordion(title, text, id, open = false) {
-  return `<div class="process-choice"><button class="process-toggle" data-action="accordion" aria-expanded="${open}" aria-controls="${id}">${title}<span class="toggle-symbol" aria-hidden="true">${open ? '−' : '+'}</span></button><div class="process-detail ${open ? '' : 'hidden'}" id="${id}">${text}</div></div>`;
-}
-function missingInfo(tags) {
-  return `<div class="question-box"><button class="question-toggle" data-action="unknown" aria-expanded="false" aria-controls="missing-body">What do we still need to know?<span aria-hidden="true">+</span></button><div class="question-body hidden" id="missing-body"><div class="unknown-tags">${tags.map(x => `<span>${x}</span>`).join('')}</div>Ask the BNBU canteen or its supplier for these records. The region and photo alone cannot verify this batch’s origin, route or footprint.</div></div>`;
-}
-function routeCard(content) {
-  return `<div class="local-route"><p class="eyebrow">${content.label}</p><ol>${content.route.map((step,i)=>`<li><span class="route-number">0${i+1}</span><span>${step}</span></li>`).join('')}</ol></div>`;
+  return `<section class="fade-in">${head('Its journey','A plate with a past.','Choose an ingredient. Follow one stage.')}<div class="journey-context">${photo('meal-thumb')}${ingredientTabs()}</div><div class="journey-track">${stages.map(stage=>`<button class="stage-card ${stage.id==='transport'?'featured':''}" data-action="stage" data-stage="${stage.id}"><span class="stage-art">${icon(stage.icon)}</span><h2>${stage.title}</h2><p>${stage.caption}</p><span class="card-disclosure">${icon('chevron')}</span></button>`).join('')}</div><div class="screen-bottom"><span class="scope-note">Regional example · actual route unverified</span>${button('sources','Sources','text-button')}</div></section>`;
 }
 function stageScreen(id) {
-  const content = regionalContent(id);
-  const stage = stages.find(x => x.id === id);
-  return `<section class="fade-in">${actionButton('go-journey', 'Back to the journey', 'back')}${head(stage.title+' · '+escapeHTML(selectedIngredient().name), content.title, content.intro)}<div class="process regional-process ${id==='transport'?'transport-layout':''}"><div>${id==='transport'?'<div class="transport-image" role="img" aria-label="Illustration of a delivery truck, not an identified BNBU delivery"></div>':''}${routeCard(content)}<div class="process-summary"><h3>In this lunch’s context</h3><p>${content.summary}</p></div></div><div><div class="process-card">${content.panels.map(([title,text],i)=>accordion(title,text,'stage-panel-'+i,i===0)).join('')}</div>${missingInfo(content.unknown)}</div></div>${processActions()}</section>`;
+  const content=shortContent(id),stage=stages.find(x=>x.id===id);
+  return `<section class="fade-in">${button('go-journey','Back to journey','back')}${head(stage.title+' · '+escapeHTML(selectedIngredient().name),withPlace(content.title))}<div class="process"><div class="process-visual">${id==='transport'?'<div class="transport-image" role="img" aria-label="Illustrative delivery truck"></div>':photo()}<ol class="route">${content.route.map(x=>`<li>${withPlace(x)}</li>`).join('')}</ol></div><div class="process-copy"><div class="fact-list">${content.facts.map(([title,text],i)=>`<div class="fact-row"><span class="fact-icon">${icon(['leaf','box','info'][i])}</span><div><h2>${title}</h2><p>${text}</p></div></div>`).join('')}</div><div class="detail-actions">${button('details','Details','text-button',`data-stage="${id}"`)}${button('curation','Behind the explanation','text-button')}</div></div></div><div class="screen-bottom"><span class="scope-note">Regional example · actual route unverified</span><div class="buttons">${button('sources','Sources','text-button')}${button('go-reflect','Reflect on your meal')}</div></div></section>`;
 }
-function transportScreen() { return stageScreen('transport'); }
-
-function processActions() {
-  return `<div class="process-actions"><div class="process-links">${actionButton('sources', 'Sources & evidence', 'info-link')}${actionButton('curation', 'How was this explanation selected?', 'info-link')}</div>${actionButton('go-reflect', 'Back to your meal')}</div>`;
-}
-function genericStageScreen(id) { return stageScreen(id); }
 function reflectionScreen() {
-  return `<section class="reflection fade-in"><div><div class="photo-panel">${photo()}<div class="photo-caption"><span>The same lunch. A little more visible.</span></div></div></div><div class="reflection-content"><p class="eyebrow">Your next meal</p><h2>What will you<br><span class="accent-word">take away?</span></h2><p class="question-title">Which of these is an example of energy use on a food journey?</p><div aria-label="Learning check">${['Cooling food during transport', 'The colour of the plate'].map((answer, i) => `<button class="answer-option ${state.quiz === i ? 'chosen' : ''}" data-action="quiz" data-index="${i}" aria-pressed="${state.quiz === i}">${answer}</button>`).join('')}</div><div class="feedback" role="status">${state.quiz === null ? '' : state.quiz === 0 ? 'Yes. Refrigeration uses energy to keep some foods at suitable temperatures during transport.' : 'Look again at the journey. Think about the equipment that keeps food cool while it moves.'}</div><div class="reflection-action"><p>At your next BNBU canteen meal, what would you ask or do?</p><label for="response">One action, or a question you would ask the canteen</label><textarea id="response" maxlength="280" placeholder="Where was this batch supplied from? Or: I will choose a portion I can finish…">${escapeHTML(state.response)}</textarea>${actionButton('save-response', 'Keep my reflection')}<div id="saved-response" class="hidden saved-response" role="status"></div><p class="local-note">Kept only in this tab until you restart or close it.</p></div><div class="buttons" style="margin-top:20px">${actionButton('go-journey', 'Explore another stage', 'text-button')}${actionButton('reset', 'Start again', 'text-button')}</div></div></section>`;
+  return `<section class="reflection fade-in"><div class="reflection-image">${photo()}<p>One meal. A little more visible.</p></div><div>${head('Your next meal','What will you take away?')}<p class="question-title">Which step uses energy?</p><div class="answers">${['Refrigerating food in transit','Changing the plate colour'].map((text,i)=>button('quiz',text,`answer-option ${state.quiz===i?'chosen':''}`,`data-index="${i}" aria-pressed="${state.quiz===i}"`)).join('')}</div><p class="feedback" role="status">${state.quiz===null?'':state.quiz===0?'Yes. Refrigeration needs energy.':'Think about equipment used during delivery.'}</p><form id="reflection-form"><label for="response">What will you ask or do at ${place()}?</label><textarea id="response" maxlength="280" placeholder="One question or one action…">${escapeHTML(state.response)}</textarea><div class="reflection-footer"><button class="primary" type="submit">Keep reflection</button><span id="saved-response" class="saved-feedback" role="status"></span></div><p class="local-note">Kept in this tab only.</p></form><div class="detail-actions">${button('go-journey','Explore another stage','text-button')}${button('reset','Start again','text-button')}</div></div></section>`;
 }
-function announce(text) { document.querySelector('#announcement').textContent = text; }
-function navigate(route) {
-  if (location.hash === '#'+route) render();
-  else location.hash = route;
-}
-function render() {
-  let route = location.hash.slice(1) || 'start';
-  const known = ['start', 'ingredients', 'journey', 'reflect', ...stages.map(x => 'process/'+x.id)];
-  if (!known.includes(route)) { navigate('start'); return; }
-  if ((route === 'journey' || route.startsWith('process/')) && !state.confirmed) {
-    navigate('ingredients'); announce('Please confirm the ingredients first.'); return;
-  }
-  if (route !== 'start' && !state.region) { navigate('start'); announce('Choose your meal and region to begin.'); return; }
-  let html;
-  if (route === 'start') html = startScreen();
-  else if (route === 'ingredients') html = ingredientsScreen();
-  else if (route === 'journey') html = journeyScreen();
-  else if (route === 'reflect') html = reflectionScreen();
-  else if (route === 'process/transport') html = transportScreen();
-  else html = genericStageScreen(route.split('/')[1]);
-  app.innerHTML = (route === 'start' ? '' : regionContext()) + html;
-  document.querySelectorAll('nav a').forEach(el => {
-    const active = route.startsWith('process/') ? el.dataset.nav === 'journey' : el.dataset.nav === route;
-    el.classList.toggle('active', active);
-    if (active) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
-  });
-  const title = route.startsWith('process/') ? stages.find(x => x.id === route.split('/')[1]).title : ({ start: 'The Journey of Your Lunch', ingredients: 'Your ingredients', journey: 'Your food journey', reflect: 'Your next meal' })[route];
-  document.title = title+' · Lunch Journey';
-  app.focus({ preventScroll: true });
-  window.scrollTo(0, 0);
-}
-function openDialog(title, html) {
-  document.querySelector('#dialog-title').textContent = title;
-  document.querySelector('#dialog-content').innerHTML = html;
-  dialog.showModal();
-}
-function editIngredient(index) {
-  const item = state.ingredients[index];
-  openDialog('Confirm this ingredient', `<form id="ingredient-form"><label class="editor-label" for="ingredient-name">Ingredient or dish name</label><input class="editor-input" id="ingredient-name" name="ingredient" value="${escapeHTML(item.name)}" maxlength="55" required><label class="editor-label" for="ingredient-group">Ingredient group for the explanation</label><select class="editor-input" id="ingredient-group">${[['vegetable','Vegetable'],['pork','Pork'],['tofu','Tofu / soybean'],['other','Other / unsure']].map(([v,n]) => `<option value="${v}" ${item.type===v?'selected':''}>${n}</option>`).join('')}</select><p class="fine">The group chooses a prepared supply-chain explanation in this prototype.</p><div class="modal-actions"><button class="primary" type="submit">Save ingredient</button></div></form>`);
-  document.querySelector('#ingredient-form').addEventListener('submit', event => {
-    event.preventDefault();
-    const name = document.querySelector('#ingredient-name').value.trim();
-    if (!name) { document.querySelector('#ingredient-name').focus(); return; }
-    state.ingredients[index] = { name, type: document.querySelector('#ingredient-group').value, note: 'Edited by you' };
-    state.confirmed = false;
-    dialog.close();
-    render();
-    announce('Ingredient updated. Confirm your ingredients to continue.');
-  });
+function showDetails(id) {
+  const variantName=variant(id), old=regionalStages[id];
+  if(variantName==='unsupported') {openDialog('Details','<p class="modal-intro">This ingredient needs its own sources and supplier records.</p>');return;}
+  const data=old[variantName];
+  openDialog(stages.find(x=>x.id===id).title+' details',`<p class="modal-intro">${place()} · Zhuhai context</p><p class="scope-note modal-scope">Illustrative processes, not verified meal tracking.</p><div class="detail-list">${data.panels.map(([title,text])=>`<details><summary>${localize(title)}${icon('chevron')}</summary><div class="detail-body">${localize(text)}</div></details>`).join('')}<details><summary>What is still unknown?${icon('chevron')}</summary><div class="detail-body"><ul>${data.unknown.map(x=>`<li>${x}</li>`).join('')}</ul><p>Ask ${place()} or its supplier for batch and kitchen records.</p></div></details></div><div class="sheet-actions">${button('sources','View sources','text-button')}${button('close-dialog','Done')}</div>`,'detail-sheet');
 }
 function showSources() {
-  openDialog('Sources & evidence', `<div class="modal-body"><div class="evidence-key"><strong>Three kinds of information</strong><p><b>Known setting:</b> the student identifies this as their BNBU canteen lunch in Zhuhai.</p><p><b>Regional evidence:</b> published supply-network and infrastructure examples.</p><p><b>Illustrative scenario:</b> a possible route or kitchen process; not a verified account of this meal.</p></div>${sources.map(s => `<a class="source-item" href="${s.url}" target="_blank" rel="noopener noreferrer"><strong><span class="source-id">${s.id}</span> ${s.title}</strong><small>${s.org}</small><small>${s.supports}</small></a>`).join('')}<p class="fine">Regional references are dated publications, not a live supplier directory. The BNBU farm, supplier, route and kitchen have not been audited for this prototype. All explanation cards work offline; opening a source website needs internet.</p></div>`);
+  openDialog('Sources',`<p class="modal-intro">Published regional examples. Actual suppliers and routes remain unverified.</p><div class="detail-list">${sources.map(source=>`<details><summary><span><small>${source.id}</small>${source.title}</span>${icon('chevron')}</summary><div class="detail-body"><p>${source.org}</p><p>${localize(source.supports)}</p><a href="${source.url}" target="_blank" rel="noopener noreferrer">Open source</a></div></details>`).join('')}</div><p class="local-note">Source websites need internet. This demo works offline.</p>`,'detail-sheet');
 }
 function showCuration() {
-  openDialog('How this explanation was selected', `<div class="modal-body"><p><strong>Hybrid curatorship</strong> connects institutional knowledge, AI support and visitor choice.</p><h3>Museum staff</h3><p>In the proposed installation, educators select reliable sources, write the knowledge cards and review their scope and accuracy.</p><h3>AI support</h3><p>The proposed AI suggests ingredients and connects the visitor’s confirmed choice to relevant cards. This demo uses preset labels and matches the confirmed ingredient, Zhuhai region and selected stage to a prepared explanation. It performs no live recognition or supplier tracing.</p><h3>You</h3><p>You select the prepared photo and region, correct the ingredient and decide which stage to open. Changing a food group changes the prepared card; an unsupported group gets an explicit information gap.</p><h3>When information is missing</h3><p>The screen separates published regional context from illustrative routes and unknown batch details. A region must never be treated as proof of origin. A museum curator would review source scope and date before publishing new cards.</p><p class="fine">Student proposal for the MoCC permanent exhibition. The prototype content has been prepared by the student project, with the sources linked here.</p></div>`);
+  openDialog('Behind the explanation',`<p class="modal-intro">Human expertise. AI support. Your choices.</p><div class="curation-list"><div><h3>Museum staff</h3><p>Select and review reliable knowledge.</p></div><div><h3>AI support</h3><p>Suggest ingredients and match relevant content.</p></div><div><h3>You</h3><p>Confirm the food, name the place, choose a stage.</p></div></div><p class="small-note">This demo uses prepared recognition and city-level examples.</p>`,'detail-sheet');
 }
-function reset() {
-  Object.assign(state, { ingredients: defaults(), selected: 1, confirmed: false, response: '', quiz: null, region: null });
-  if (dialog.open) dialog.close();
-  navigate('start');
+function editIngredient(index) {
+  const item=state.ingredients[index];
+  openDialog('Edit ingredient',`<form id="ingredient-form"><div class="field"><label for="ingredient-name">Ingredient or dish</label><input id="ingredient-name" value="${escapeHTML(item.name)}" maxlength="55" required></div><div class="field"><label for="ingredient-group">Ingredient group</label><select id="ingredient-group">${[['vegetable','Vegetable'],['pork','Pork'],['tofu','Tofu / soybean'],['other','Other / unsure']].map(([v,t])=>`<option value="${v}" ${v===item.type?'selected':''}>${t}</option>`).join('')}</select></div><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}<button class="primary" type="submit">Save ingredient</button></div></form>`,'region-sheet');
+  document.querySelector('#ingredient-form').addEventListener('submit',event=>{event.preventDefault();const name=document.querySelector('#ingredient-name').value.trim();if(!name)return;state.ingredients[index]={name,type:document.querySelector('#ingredient-group').value};state.confirmed=false;dialog.close();navigate('ingredients');announce('Ingredient updated.');});
 }
-function saveResponse() {
-  const field = document.querySelector('#response');
-  const value = field.value.trim();
-  if (!value) { field.focus(); announce('Write one action or question first.'); return; }
-  state.response = value;
-  const result = document.querySelector('#saved-response');
-  result.textContent = value;
-  result.classList.remove('hidden');
-  announce('Reflection kept in this tab.');
+function announce(text) {document.querySelector('#announcement').textContent=text;}
+function navigate(route) {if(location.hash==='#'+route)render();else location.hash=route;}
+function render() {
+  let route=location.hash.slice(1)||'start';
+  const known=['start','ingredients','journey','reflect',...stages.map(x=>'process/'+x.id)];
+  if(!known.includes(route)){navigate('start');return;}
+  if(route!=='start'&&(!state.photoSelected||!state.region)){navigate('start');return;}
+  if((route==='journey'||route.startsWith('process/'))&&!state.confirmed){navigate('ingredients');announce('Confirm your ingredients first.');return;}
+  document.body.dataset.screen=route==='start'?'start':'experience';
+  const screen=route==='start'?startScreen():route==='ingredients'?ingredientsScreen():route==='journey'?journeyScreen():route==='reflect'?reflectionScreen():stageScreen(route.split('/')[1]);
+  app.innerHTML=(route==='start'?'':regionContext())+screen;
+  document.querySelectorAll('nav a').forEach(link=>{const active=(route.startsWith('process/')?'journey':route)===link.dataset.nav;link.classList.toggle('active',active);if(active)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});
+  document.title=(route==='start'?'Lunch Journey':(route.startsWith('process/')?stages.find(x=>x.id===route.split('/')[1]).title:({ingredients:'Your meal',journey:'Its journey',reflect:'Reflection'})[route]))+' · MoCC';
+  if(route==='reflect')document.querySelector('#reflection-form').addEventListener('submit',event=>{event.preventDefault();const field=document.querySelector('#response');if(!field.value.trim()){field.focus();return;}state.response=field.value.trim();document.querySelector('#saved-response').textContent='Kept in this tab';announce('Reflection kept in this tab.');});
+  app.focus({preventScroll:true});window.scrollTo(0,0);
 }
-const actions = {
-  sample: chooseRegion,
-  'choose-photo': choosePhoto,
-  edit: el => editIngredient(Number(el.dataset.index)),
-  confirm: () => { state.confirmed=true; navigate('journey'); },
-  'select-ingredient': el => { state.selected=Number(el.dataset.index); render(); },
-  stage: el => navigate('process/'+el.dataset.stage),
-  accordion: el => { const open=el.getAttribute('aria-expanded')==='true'; if(!open){app.querySelectorAll('.process-toggle').forEach(other=>{other.setAttribute('aria-expanded','false');document.getElementById(other.getAttribute('aria-controls')).classList.add('hidden');other.querySelector('.toggle-symbol').textContent='+';});} el.setAttribute('aria-expanded',String(!open));document.getElementById(el.getAttribute('aria-controls')).classList.toggle('hidden',open);el.querySelector('.toggle-symbol').textContent=open?'+':'−'; },
-  unknown: el => { const open=el.getAttribute('aria-expanded')==='true';el.setAttribute('aria-expanded',String(!open));document.querySelector('#missing-body').classList.toggle('hidden',open);el.querySelector('span').textContent=open?'+':'−'; },
-  sources: showSources,
-  curation: showCuration,
-  'go-ingredients': () => navigate('ingredients'),
-  'go-journey': () => navigate('journey'),
-  'go-reflect': () => navigate('reflect'),
-  quiz: el => { const response=document.querySelector('#response');if(response)state.response=response.value;state.quiz=Number(el.dataset.index);render(); },
-  'save-response': saveResponse,
-  reset
+function reset(){Object.assign(state,{ingredients:defaults(),selected:1,confirmed:false,photoSelected:false,galleryChoice:false,region:null,placeName:'',response:'',quiz:null});if(dialog.open)dialog.close();navigate('start');}
+const actions={
+  'choose-photo':choosePhoto,
+  'select-photo':el=>{state.galleryChoice=true;el.classList.add('selected');el.setAttribute('aria-pressed','true');document.querySelector('[data-action="photo-next"]').disabled=false;},
+  'photo-next':()=>{if(state.galleryChoice)chooseRegion();},
+  'close-dialog':()=>dialog.close(),
+  'edit-place':()=>chooseRegion(true),
+  edit:el=>editIngredient(Number(el.dataset.index)),
+  confirm:()=>{state.confirmed=true;navigate('journey');},
+  stage:el=>navigate('process/'+el.dataset.stage),
+  details:el=>showDetails(el.dataset.stage),
+  'go-journey':()=>navigate('journey'), 'go-reflect':()=>navigate('reflect'),
+  quiz:el=>{const response=document.querySelector('#response');if(response)state.response=response.value;state.quiz=Number(el.dataset.index);render();},
+  sources:showSources,curation:showCuration,reset
 };
-document.addEventListener('click', event => {
-  const el=event.target.closest('[data-action]');
-  if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
-});
+document.addEventListener('click',event=>{if(event.target.closest('.skip-link')){event.preventDefault();app.focus();return;}const el=event.target.closest('[data-action]');if(el&&!el.disabled&&actions[el.dataset.action])actions[el.dataset.action](el);});
+document.addEventListener('change',event=>{if(event.target.matches('input[name="ingredient"]')){state.selected=Number(event.target.value);render();document.querySelector('input[name="ingredient"][value="'+state.selected+'"]').focus({preventScroll:true});}});
+document.addEventListener('input',event=>{if(event.target.id==='response')state.response=event.target.value;});
 document.querySelector('#reset').addEventListener('click',reset);
 document.querySelector('#close-dialog').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('click',event=>{ if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();} });
-document.querySelector('#fullscreen').addEventListener('click',async()=>{
-  try {
-    if(document.fullscreenElement) await document.exitFullscreen();
-    else if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
-    else announce('Use your browser full-screen command.');
-  } catch { announce('Use your browser full-screen command.'); }
-});
-window.addEventListener('hashchange',()=>{ if(dialog.open)dialog.close(); render(); });
-document.addEventListener('input',event=>{if(event.target.id==='response')state.response=event.target.value;});
+dialog.addEventListener('close',()=>{const target=dialog.returnFocus;if(target?.isConnected)target.focus({preventScroll:true});});
+dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+document.querySelector('#fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else announce('Use the browser full-screen command.');}catch{announce('Use the browser full-screen command.');}});
+window.addEventListener('hashchange',()=>{if(dialog.open)dialog.close();render();});
 render();
