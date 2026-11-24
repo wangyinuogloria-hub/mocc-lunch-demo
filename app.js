@@ -387,7 +387,7 @@ const defaults = () => [
   { name:'Braised pork', type:'pork' },
   { name:'Pork tenderloin', type:'pork' }
 ];
-const state = { ingredients:defaults(), selected:1, confirmed:false, photoSelected:false, galleryChoice:false, region:null, placeName:'', response:'', quiz:null };
+const state = { ingredients:defaults(), selected:1, confirmed:false, photoSelected:false, galleryChoice:false, region:null, placeName:'', response:'', quiz:null, journalMode:'mine', journalMonth:localToday().slice(0,7), entryId:null };
 const locations = {
   China: {
     Guangdong:['Zhuhai','Guangzhou','Shenzhen','Zhongshan','Jiangmen','Foshan','Dongguan','Huizhou'],
@@ -428,6 +428,8 @@ const shortStages = {
   }
 };
 const paths = {
+  user:'M20 21v-2a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v2M16 5a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  book:'M4 3h13a3 3 0 0 1 3 3v15H7a3 3 0 0 1-3-3V3ZM4 17h16M8 7h8M8 11h5',
   leaf:'M20 4c0 9-3 15-10 15a6 6 0 0 1-6-6C4 6 11 4 20 4ZM5 20 16 9',
   plus:'M12 5v14M5 12h14', check:'m5 12 4 4L19 6', close:'m6 6 12 12M18 6 6 18',
   expand:'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5',
@@ -466,7 +468,7 @@ function regionContext() {
   return `<div class="region-context"><button class="place-button" data-action="edit-place" aria-label="Edit place">${icon('pin')}<strong>${place()}</strong></button><span>${escapeHTML(state.region.city)}, ${escapeHTML(state.region.province)}, ${escapeHTML(state.region.country)}</span></div>`;
 }
 function startScreen() {
-  return `<section class="hero fade-in"><div class="hero-emblem" aria-hidden="true">${icon('leaf')}</div><h1>Your lunch.<br><span>A bigger story.</span></h1><p>Explore the hidden journey behind your meal.</p>${button('choose-photo','Choose a photo')}<span class="hero-note">Food. Energy. Everyday life.</span></section>`;
+  return `<section class="hero fade-in"><div class="hero-emblem" aria-hidden="true">${icon('leaf')}</div><h1>Your lunch.<br><span>A bigger story.</span></h1><p>Explore the hidden journey behind your meal.</p>${button('choose-photo','Choose a photo')}${button('open-journal','Open my lunchbook','text-button')}<span class="hero-note">Food. Energy. Everyday life.</span></section>`;
 }
 function openDialog(title,html,kind='') {
   if(!dialog.open) dialog.returnFocus=document.activeElement;
@@ -502,13 +504,13 @@ function chooseRegion(editing=false) {
     if(country.value!=='China'||province.value!=='Guangdong'||city.value!=='Zhuhai'){
       form.querySelector('#region-feedback').textContent='Choose China, Guangdong and Zhuhai to use the local demo.';city.setAttribute('aria-invalid','true');city.focus();return;
     }
-    if(!editing){state.ingredients=defaults();state.selected=1;state.confirmed=false;}
+    if(!editing){state.ingredients=defaults();state.selected=1;state.confirmed=false;state.entryId=null;}
     state.region={country:country.value,province:province.value,city:city.value};state.placeName=name.value.trim();state.photoSelected=true;
     dialog.close();if(editing)render();else navigate('ingredients');
   });
 }
 function ingredientsScreen() {
-  return `<section class="fade-in">${head('Your meal',`Lunch at ${place()}.`,'Confirm what’s on your plate.')}<div class="recognition"><div class="photo-panel">${photo('',true)}</div><div class="ingredient-side"><p class="section-label">Ingredients</p><ul class="ingredient-list">${state.ingredients.map((item,i)=>`<li><span class="ingredient-name">${escapeHTML(item.name)}</span>${button('edit','Edit','text-button',`data-index="${i}" aria-label="Edit ${escapeHTML(item.name)} ingredient"`)}</li>`).join('')}</ul><p class="small-note">AI suggestions can be corrected.</p>${button('confirm','Confirm ingredients')}<div class="minor-action">${button('choose-photo','Change photo','text-button')}</div></div></div></section>`;
+  return `<section class="fade-in">${head('Your meal',`Lunch at ${place()}.`,'Confirm what’s on your plate.')}<div class="recognition"><div class="photo-panel">${photo('',true)}</div><div class="ingredient-side"><p class="section-label">Ingredients</p><ul class="ingredient-list">${state.ingredients.map((item,i)=>`<li><span class="ingredient-identity">${foodArt(item,'small')}<span class="ingredient-name">${escapeHTML(item.name)}</span></span>${button('edit','Edit','text-button',`data-index="${i}" aria-label="Edit ${escapeHTML(item.name)} ingredient"`)}</li>`).join('')}</ul><p class="small-note">AI suggestions can be corrected.</p>${button('confirm','Confirm ingredients')}<div class="minor-action">${button('choose-photo','Change photo','text-button')}</div></div></div></section>`;
 }
 function ingredientTabs() {
   return `<fieldset class="ingredient-tabs"><legend class="sr-only">Choose an ingredient</legend>${state.ingredients.map((item,i)=>`<label class="ingredient-tab"><input type="radio" name="ingredient" value="${i}" ${state.selected===i?'checked':''}><span>${escapeHTML(item.name)}</span></label>`).join('')}</fieldset>`;
@@ -521,7 +523,7 @@ function stageScreen(id) {
   return `<section class="fade-in">${button('go-journey','Back to journey','back')}${head(stage.title+' · '+escapeHTML(selectedIngredient().name),withPlace(content.title))}<div class="process"><div class="process-visual">${id==='transport'?'<div class="transport-image" role="img" aria-label="Illustrative delivery truck"></div>':photo()}<ol class="route">${content.route.map(x=>`<li>${withPlace(x)}</li>`).join('')}</ol></div><div class="process-copy"><div class="fact-list">${content.facts.map(([title,text],i)=>`<div class="fact-row"><span class="fact-icon">${icon(['leaf','box','info'][i])}</span><div><h2>${title}</h2><p>${text}</p></div></div>`).join('')}</div><div class="detail-actions">${button('details','Details','text-button',`data-stage="${id}"`)}${button('curation','Behind the explanation','text-button')}</div></div></div><div class="screen-bottom"><span class="scope-note">Regional example · actual route unverified</span><div class="buttons">${button('sources','Sources','text-button')}${button('go-reflect','Reflect on your meal')}</div></div></section>`;
 }
 function reflectionScreen() {
-  return `<section class="reflection fade-in"><div class="reflection-image">${photo()}<p>One meal. A little more visible.</p></div><div>${head('Your next meal','What will you take away?')}<p class="question-title">Which step uses energy?</p><div class="answers">${['Refrigerating food in transit','Changing the plate colour'].map((text,i)=>button('quiz',text,`answer-option ${state.quiz===i?'chosen':''}`,`data-index="${i}" aria-pressed="${state.quiz===i}"`)).join('')}</div><p class="feedback" role="status">${state.quiz===null?'':state.quiz===0?'Yes. Refrigeration needs energy.':'Think about equipment used during delivery.'}</p><form id="reflection-form"><label for="response">What will you ask or do at ${place()}?</label><textarea id="response" maxlength="280" placeholder="One question or one action…">${escapeHTML(state.response)}</textarea><div class="reflection-footer"><button class="primary" type="submit">Keep reflection</button><span id="saved-response" class="saved-feedback" role="status"></span></div><p class="local-note">Kept in this tab only.</p></form><div class="detail-actions">${button('go-journey','Explore another stage','text-button')}${button('reset','Start again','text-button')}</div></div></section>`;
+  return `<section class="reflection fade-in"><div class="reflection-image">${photo()}<p>One meal. A little more visible.</p></div><div>${head('Your next meal','What will you take away?')}<p class="question-title">Which step uses energy?</p><div class="answers">${['Refrigerating food in transit','Changing the plate colour'].map((text,i)=>button('quiz',text,`answer-option ${state.quiz===i?'chosen':''}`,`data-index="${i}" aria-pressed="${state.quiz===i}"`)).join('')}</div><p class="feedback" role="status">${state.quiz===null?'':state.quiz===0?'Yes. Refrigeration needs energy.':'Think about equipment used during delivery.'}</p><form id="reflection-form"><label for="response">What will you ask or do at ${place()}?</label><textarea id="response" maxlength="280" placeholder="One question or one action…">${escapeHTML(state.response)}</textarea><div class="reflection-footer"><button class="primary" type="submit">Keep reflection</button><span id="saved-response" class="saved-feedback" role="status"></span></div><p class="local-note">Kept in this tab only.</p></form><div class="save-to-book"><div><h3>Keep the story going.</h3><p>Save this lunch. Notice your monthly patterns.</p></div>${button('save-meal',state.entryId?'Update lunch record':'Save this lunch')}</div><div class="detail-actions">${button('go-journey','Explore another stage','text-button')}${button('reset','Start again','text-button')}</div></div></section>`;
 }
 function showDetails(id) {
   const variantName=variant(id), old=regionalStages[id];
@@ -537,27 +539,98 @@ function showCuration() {
 }
 function editIngredient(index) {
   const item=state.ingredients[index];
-  openDialog('Edit ingredient',`<form id="ingredient-form"><div class="field"><label for="ingredient-name">Ingredient or dish</label><input id="ingredient-name" value="${escapeHTML(item.name)}" maxlength="55" required></div><div class="field"><label for="ingredient-group">Ingredient group</label><select id="ingredient-group">${[['vegetable','Vegetable'],['pork','Pork'],['tofu','Tofu / soybean'],['other','Other / unsure']].map(([v,t])=>`<option value="${v}" ${v===item.type?'selected':''}>${t}</option>`).join('')}</select></div><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}<button class="primary" type="submit">Save ingredient</button></div></form>`,'region-sheet');
+  openDialog('Edit ingredient',`<div class="ingredient-art-preview">${foodArt(item)}<p>Inspired by your meal</p></div><form id="ingredient-form"><div class="field"><label for="ingredient-name">Ingredient or dish</label><input id="ingredient-name" value="${escapeHTML(item.name)}" maxlength="55" required></div><div class="field"><label for="ingredient-group">Ingredient group</label><select id="ingredient-group">${[['vegetable','Vegetable'],['pork','Pork'],['tofu','Tofu / soybean'],['other','Other / unsure']].map(([v,t])=>`<option value="${v}" ${v===item.type?'selected':''}>${t}</option>`).join('')}</select></div><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}<button class="primary" type="submit">Save ingredient</button></div></form>`,'region-sheet');
   document.querySelector('#ingredient-form').addEventListener('submit',event=>{event.preventDefault();const name=document.querySelector('#ingredient-name').value.trim();if(!name)return;state.ingredients[index]={name,type:document.querySelector('#ingredient-group').value};state.confirmed=false;dialog.close();navigate('ingredients');announce('Ingredient updated.');});
 }
 function announce(text) {document.querySelector('#announcement').textContent=text;}
 function navigate(route) {if(location.hash==='#'+route)render();else location.hash=route;}
 function render() {
   let route=location.hash.slice(1)||'start';
-  const known=['start','ingredients','journey','reflect',...stages.map(x=>'process/'+x.id)];
+  const known=['start','ingredients','journey','reflect','journal',...stages.map(x=>'process/'+x.id)];
   if(!known.includes(route)){navigate('start');return;}
-  if(route!=='start'&&(!state.photoSelected||!state.region)){navigate('start');return;}
+  if(!['start','journal'].includes(route)&&(!state.photoSelected||!state.region)){navigate('start');return;}
   if((route==='journey'||route.startsWith('process/'))&&!state.confirmed){navigate('ingredients');announce('Confirm your ingredients first.');return;}
   document.body.dataset.screen=route==='start'?'start':'experience';
-  const screen=route==='start'?startScreen():route==='ingredients'?ingredientsScreen():route==='journey'?journeyScreen():route==='reflect'?reflectionScreen():stageScreen(route.split('/')[1]);
-  app.innerHTML=(route==='start'?'':regionContext())+screen;
+  const screen=route==='journal'?journalScreen():route==='start'?startScreen():route==='ingredients'?ingredientsScreen():route==='journey'?journeyScreen():route==='reflect'?reflectionScreen():stageScreen(route.split('/')[1]);
+  app.innerHTML=(['start','journal'].includes(route)?'':regionContext())+screen;
   document.querySelectorAll('nav a').forEach(link=>{const active=(route.startsWith('process/')?'journey':route)===link.dataset.nav;link.classList.toggle('active',active);if(active)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});
-  document.title=(route==='start'?'Lunch Journey':(route.startsWith('process/')?stages.find(x=>x.id===route.split('/')[1]).title:({ingredients:'Your meal',journey:'Its journey',reflect:'Reflection'})[route]))+' · MoCC';
+  document.title=(route==='start'?'Lunch Journey':(route.startsWith('process/')?stages.find(x=>x.id===route.split('/')[1]).title:({ingredients:'Your meal',journey:'Its journey',reflect:'Reflection',journal:'My lunchbook'})[route]))+' · MoCC';
   if(route==='reflect')document.querySelector('#reflection-form').addEventListener('submit',event=>{event.preventDefault();const field=document.querySelector('#response');if(!field.value.trim()){field.focus();return;}state.response=field.value.trim();document.querySelector('#saved-response').textContent='Kept in this tab';announce('Reflection kept in this tab.');});
-  app.focus({preventScroll:true});window.scrollTo(0,0);
+  refreshAccount();app.focus({preventScroll:true});window.scrollTo(0,0);
 }
-function reset(){Object.assign(state,{ingredients:defaults(),selected:1,confirmed:false,photoSelected:false,galleryChoice:false,region:null,placeName:'',response:'',quiz:null});if(dialog.open)dialog.close();navigate('start');}
+function reset(){Object.assign(state,{ingredients:defaults(),selected:1,confirmed:false,photoSelected:false,galleryChoice:false,region:null,placeName:'',response:'',quiz:null,entryId:null});if(dialog.open)dialog.close();navigate('start');}
+// The account is a local demonstration profile. No passwords or cloud service.
+const BOOK_KEY='mocc-lunchbook-v1';
+const book=readBook();
+function readBook(){try{const v=JSON.parse(localStorage.getItem('mocc-lunchbook-v1')||'null');if(v?.version===1&&Array.isArray(v.profiles)&&Array.isArray(v.entries))return v;}catch{}return {version:1,profiles:[],entries:[],activeId:null};}
+function writeBook(){try{localStorage.setItem(BOOK_KEY,JSON.stringify(book));return true;}catch{return false;}}
+function localToday(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function newId(){return window.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function activeProfile(){return book.profiles.find(p=>p.id===book.activeId)||null;}
+function foodArt(item,cls=''){
+  const kind=item.type==='vegetable'?'cabbage':item.type==='pork'?(/tenderloin|fried|里脊|炸/i.test(item.name)?'fried':'pork'):'other';
+  return `<span class="food-art ${kind} ${cls}" role="img" aria-label="${escapeHTML(item.name)} illustration">${kind==='other'?icon('leaf'):''}</span>`;
+}
+function refreshAccount(){const p=activeProfile();const el=document.querySelector('#account');el.innerHTML=icon('user')+`<span>${p?escapeHTML(p.name):'Sign in'}</span>`;el.setAttribute('aria-label',p?'Account: '+p.name:'Sign in to lunchbook');}
+function signIn(after='journal'){
+  const p=activeProfile();
+  if(p){openDialog('Your account',`<div class="profile-card"><span class="profile-avatar">${icon('user')}</span><h3>${escapeHTML(p.name)}</h3><p>Local demo profile</p></div><p class="small-note">Your saved lunches stay in this browser. No cloud sign-in or sync.</p><div class="sheet-actions">${button('sign-out','Sign out','text-button')}${button('open-journal','Open lunchbook')}</div>`,'account-sheet');return;}
+  openDialog('Your lunchbook',`<p class="modal-intro">Keep your meals. Notice your patterns.</p><form id="profile-form"><div class="field"><label for="profile-name">Display name</label><input id="profile-name" maxlength="32" placeholder="Your name" required autocomplete="off"></div><p class="local-note">Demo sign-in · saved in this browser, no password or cloud account.</p><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}<button class="primary" type="submit">Enter demo account</button></div></form>`,'account-sheet');
+  document.querySelector('#profile-form').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#profile-name').value.trim();if(!name)return;let p=book.profiles.find(x=>x.name.toLowerCase()===name.toLowerCase());if(!p){p={id:newId(),name};book.profiles.push(p);}book.activeId=p.id;state.journalMode='mine';writeBook();dialog.close();refreshAccount();if(after==='save')openSaveMeal();else navigate('journal');});
+}
+function sampleEntries(month){
+  const rows=[
+    [2,['Chinese cabbage','Braised pork','Pork tenderloin'],['Zhuhai','Guangdong','Not recorded'],['Road','Road','Not recorded'],['Finished my portion']],
+    [4,['Rice','Tofu','Broccoli'],['Guangdong','Guangdong','Zhuhai'],['Road','Road','Road'],['Chose more vegetables']],
+    [8,['Rice','Chicken','Tomato'],['Not recorded','Guangdong','Zhuhai'],['Not recorded','Road','Road'],['Asked about food origin']],
+    [11,['Chinese cabbage','Egg','Rice'],['Zhuhai','Guangdong','Not recorded'],['Road','Road','Not recorded'],['Finished my portion']],
+    [15,['Tofu','Broccoli','Rice'],['Guangdong','Zhuhai','Guangdong'],['Road','Road','Rail'],['Chose more vegetables']],
+    [19,['Tomato','Egg','Rice'],['Zhuhai','Not recorded','Guangdong'],['Road','Not recorded','Road'],['Finished my portion']],
+    [22,['Chinese cabbage','Chicken','Rice'],['Zhuhai','Guangdong','Not recorded'],['Road','Road','Not recorded'],['Asked about food origin']]
+  ];
+  return rows.map(([day,names,origins,modes,actions],i)=>({id:'example-'+i,date:`${month}-${String(day).padStart(2,'0')}`,placeName:'Example canteen',city:'Zhuhai',ingredients:names.map((name,j)=>({name,type:/cabbage|broccoli|tomato/i.test(name)?'vegetable':/pork/i.test(name)?'pork':'other',origin:origins[j],transport:modes[j],evidence:'Illustrative example'})),actions,reflection:'',example:true}));
+}
+function selectedEntries(){const p=activeProfile();return (state.journalMode==='example'?sampleEntries(state.journalMonth):book.entries.filter(x=>x.profileId===p?.id)).filter(x=>x.date.slice(0,7)===state.journalMonth).sort((a,b)=>b.date.localeCompare(a.date));}
+function ingredientKey(i){return i.type==='pork'||/pork|红烧肉|里脊/i.test(i.name)?'pork':i.type==='tofu'||/^(tofu|soybean)$/i.test(i.name.trim())?'tofu':i.name.trim().toLowerCase().replace(/\s+/g,' ');}
+function tally(entries,key){const counts={};entries.flatMap(e=>e.ingredients).forEach(i=>{const k=String(i[key]||'Not recorded').trim()||'Not recorded';counts[k]=(counts[k]||0)+1;});return Object.entries(counts).sort((a,b)=>b[1]-a[1]);}
+function bars(entries,key){const rows=tally(entries,key),max=Math.max(1,...rows.map(x=>x[1]));return rows.length?rows.map(([label,n])=>`<div class="report-bar"><div><span>${escapeHTML(label)}</span><strong>${n}</strong></div><span class="bar-track"><span class="${label==='Not recorded'?'unrecorded':''}" style="width:${100*n/max}%"></span></span></div>`).join(''):'<p class="empty-chart">No observations yet.</p>';}
+function journalScreen(){
+  const p=activeProfile();
+  if(!p&&state.journalMode!=='example')return `<section class="book-welcome fade-in"><div class="hero-emblem">${icon('book')}</div>${head('My lunchbook','One lunch becomes a habit.','Save a meal. Notice the patterns. Choose one next step.')}<div class="buttons">${button('sign-in','Sign in to your lunchbook')}${button('example-month','View an example month','secondary')}</div><p class="small-note">Local demo profiles · no cloud account required.</p></section>`;
+  const entries=selectedEntries(),ingredients=entries.flatMap(x=>x.ingredients),unique=new Set(ingredients.map(ingredientKey)),actions=entries.reduce((n,e)=>n+e.actions.length,0),unknown=ingredients.filter(i=>!i.origin||i.origin==='Not recorded').length;
+  return `<section class="lunchbook fade-in">${head(state.journalMode==='example'?'An example month':escapeHTML(p.name)+'’s lunchbook','Small choices, over time.')}<div class="book-toolbar"><div class="book-modes" aria-label="Record type">${button('book-mode','My meals',state.journalMode==='mine'?'selected':'',`data-mode="mine" aria-pressed="${state.journalMode==='mine'}"`)}${button('book-mode','Example month',state.journalMode==='example'?'selected':'',`data-mode="example" aria-pressed="${state.journalMode==='example'}"`)}</div><label class="month-picker"><span>Month</span><input id="journal-month" type="month" value="${state.journalMonth}" aria-label="Lunchbook month"></label>${button('new-lunch','Log a lunch')}</div>${state.journalMode==='example'?'<p class="example-banner">Illustrative example data · separate from your saved meals.</p>':'<p class="book-caption">Your observations, saved in this browser.</p>'}<div class="book-stats"><div><strong>${entries.length}</strong><span>Lunches logged</span></div><div><strong>${unique.size}</strong><span>Distinct ingredients</span></div><div><strong>${actions}</strong><span>Actions logged</span></div></div><p class="variety-note">Variety counts primary ingredients: two pork dishes count as pork once.</p><div class="report-grid"><article class="report-card"><div class="report-heading">${icon('pin')}<h2>Ingredient origins</h2></div>${bars(entries,'origin')}<p class="local-note">Counts of ingredient records, not eating locations.</p></article><article class="report-card"><div class="report-heading">${icon('truck')}<h2>Reported transport</h2></div>${bars(entries,'transport')}<p class="local-note">Main mode recorded per ingredient; other legs may be unknown.</p></article></div><div class="book-insight">${icon('leaf')}<p>${!ingredients.length?'Start with one lunch. An unknown origin is a useful question.':unknown?`${unknown} of ${ingredients.length} ingredient origins are unrecorded. Next time, ask the canteen about one ingredient.`:'You recorded an origin for every ingredient. Keep the supporting information with each meal.'}</p></div><div class="book-list-heading"><h2>${state.journalMode==='example'?'Example lunches':'Your lunches'}</h2>${button('export-book','Export records','text-button',(!entries.length||state.journalMode==='example')?'disabled':'')}</div><div class="meal-entries">${entries.length?entries.map(e=>`<button class="meal-entry" data-action="view-entry" data-id="${e.id}">${e.example?`<span class="entry-placeholder">${icon('book')}</span>`:photo('entry-photo')}<span><strong>${escapeHTML(e.placeName)}</strong><small>${escapeHTML(e.date)} · ${e.ingredients.length} ingredients</small><span class="entry-names">${e.ingredients.map(i=>escapeHTML(i.name)).join(' · ')}</span></span>${icon('chevron')}</button>`).join(''):`<div class="empty-book"><h3>No lunches saved this month.</h3><p>Keep one meal and begin your record.</p>${button('new-lunch','Log your first lunch','secondary')}</div>`}</div><p class="local-note book-footnote">Observations and actions, not a measured carbon footprint. Source and transport claims are visitor-reported unless marked as illustrative.</p></section>`;
+}
+function openSaveMeal(){
+  if(!state.confirmed){navigate('ingredients');return;}
+  if(!activeProfile()){signIn('save');return;}
+  const existing=book.entries.find(x=>x.id===state.entryId&&x.profileId===book.activeId);
+  const practices=['Finished my portion','Chose more vegetables','Asked about food origin'];
+  openDialog(existing?'Update lunch':'Save this lunch',`<div class="save-meal-preview">${photo('meal-thumb')}<div><strong>${place()}</strong><small>${state.ingredients.map(i=>escapeHTML(i.name)).join(' · ')}</small></div></div><form id="meal-log-form"><div class="field"><label for="meal-date">Lunch date</label><input id="meal-date" type="date" value="${existing?.date||localToday()}" max="${localToday()}" required></div><fieldset class="practice-options"><legend>One action today · optional</legend>${practices.map((x,i)=>`<label><input type="checkbox" name="practice" value="${x}" ${existing?.actions.includes(x)?'checked':''}>${x}</label>`).join('')}</fieldset><details class="source-entry-details"><summary>Add source or transport details${icon('chevron')}</summary><p class="local-note">Leave unknown details blank. An eating location is not a food origin.</p>${state.ingredients.map((item,i)=>{const old=existing?.ingredients.find(x=>x.name===item.name&&x.type===item.type);return `<div class="ingredient-source-row"><h3>${escapeHTML(item.name)}</h3><div class="field"><label for="origin-${i}">Origin · if known</label><input id="origin-${i}" maxlength="80" value="${old?.origin&&old.origin!=='Not recorded'?escapeHTML(old.origin):''}" placeholder="Not recorded"></div><div class="field"><label for="mode-${i}">Main transport mode · if known</label><select id="mode-${i}">${['Not recorded','Road','Rail','Sea','Air'].map(mode=>`<option ${old?.transport===mode?'selected':''}>${mode}</option>`).join('')}</select></div><div class="field"><label for="evidence-${i}">Where did you learn this?</label><input id="evidence-${i}" maxlength="180" value="${old?.evidence?escapeHTML(old.evidence):''}" placeholder="Canteen reply, label, or delivery record"></div></div>`;}).join('')}</details><p id="log-feedback" class="form-feedback" role="status"></p><div class="sheet-actions">${button('close-dialog','Cancel','text-button')}<button type="submit" class="primary">${existing?'Update lunch':'Save to lunchbook'}</button></div></form>`,'save-meal-sheet');
+  document.querySelector('#meal-log-form').addEventListener('submit',event=>{
+    event.preventDefault();const date=document.querySelector('#meal-date').value;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>localToday())return;
+    const ingredients=state.ingredients.map((item,i)=>({...item,origin:document.querySelector('#origin-'+i).value.trim()||'Not recorded',transport:document.querySelector('#mode-'+i).value,evidence:document.querySelector('#evidence-'+i).value.trim(),provenance:'Visitor reported'}));
+    const ungrounded=ingredients.some(i=>(i.origin!=='Not recorded'||i.transport!=='Not recorded')&&!i.evidence);
+    if(ungrounded){document.querySelector('#log-feedback').textContent='Add where you learned each source or transport detail, or leave it unrecorded.';document.querySelector('.source-entry-details').open=true;return;}
+    const entry={id:existing?.id||newId(),profileId:book.activeId,date,placeName:state.placeName,city:state.region.city,ingredients,actions:[...document.querySelectorAll('input[name="practice"]:checked')].map(x=>x.value),reflection:state.response,example:false};
+    const at=book.entries.findIndex(x=>x.id===entry.id);if(at<0)book.entries.push(entry);else book.entries[at]=entry;
+    state.entryId=entry.id;const persisted=writeBook();state.journalMode='mine';state.journalMonth=date.slice(0,7);dialog.close();navigate('journal');announce(persisted?'Lunch saved on this device.':'Lunch kept for this session; browser storage is unavailable.');
+  });
+}
+function viewEntry(id){const e=selectedEntries().find(x=>x.id===id);if(!e)return;openDialog(e.placeName,`<p class="modal-intro">${escapeHTML(e.date)} · ${escapeHTML(e.city)}</p>${e.example?'<p class="example-banner">Illustrative example, not a personal record.</p>':''}<div class="entry-detail-list">${e.ingredients.map(i=>`<div><h3>${escapeHTML(i.name)}</h3><p>Origin: ${escapeHTML(i.origin||'Not recorded')}</p><p>Transport: ${escapeHTML(i.transport||'Not recorded')}</p><small>${escapeHTML(i.evidence||'No supporting detail recorded')}</small></div>`).join('')}</div>${e.actions.length?`<h3 class="entry-action-heading">Actions logged</h3><p>${e.actions.map(escapeHTML).join(' · ')}</p>`:''}${e.reflection?`<h3 class="entry-action-heading">My reflection</h3><p>${escapeHTML(e.reflection)}</p>`:''}<div class="sheet-actions">${e.example?'<span class="local-note">Example data</span>':button('edit-entry','Edit record','text-button',`data-id="${e.id}"`)}${button('close-dialog','Done')}</div>`,'detail-sheet');}
+function editEntry(id){const e=book.entries.find(x=>x.id===id&&x.profileId===book.activeId);if(!e)return;Object.assign(state,{entryId:e.id,ingredients:e.ingredients.map(i=>({...i})),selected:1,confirmed:true,photoSelected:true,placeName:e.placeName,region:{country:'China',province:'Guangdong',city:e.city},response:e.reflection||''});openSaveMeal();}
+function exportBook(){const p=activeProfile();if(!p||state.journalMode==='example')return;const entries=selectedEntries();const blob=new Blob([JSON.stringify({profile:p.name,month:state.journalMonth,entries},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`lunchbook-${state.journalMonth}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
 const actions={
+  'open-journal':()=>{if(dialog.open)dialog.close();state.journalMode='mine';navigate('journal');},
+  'sign-in':()=>signIn(),
+  'sign-out':()=>{book.activeId=null;state.journalMode='mine';writeBook();if(dialog.open)dialog.close();state.entryId=null;refreshAccount();navigate('journal');},
+  'save-meal':openSaveMeal,
+  'example-month':()=>{state.journalMode='example';navigate('journal');},
+  'book-mode':el=>{state.journalMode=el.dataset.mode;render();},
+  'new-lunch':()=>{const atStart=!location.hash||location.hash==='#start';reset();if(atStart)choosePhoto();else window.addEventListener('hashchange',()=>choosePhoto(),{once:true});},
+  'view-entry':el=>viewEntry(el.dataset.id),
+  'export-book':exportBook,
+  'edit-entry':el=>editEntry(el.dataset.id),
   'choose-photo':choosePhoto,
   'select-photo':el=>{state.galleryChoice=true;el.classList.add('selected');el.setAttribute('aria-pressed','true');document.querySelector('[data-action="photo-next"]').disabled=false;},
   'photo-next':()=>{if(state.galleryChoice)chooseRegion();},
@@ -574,6 +647,8 @@ const actions={
 document.addEventListener('click',event=>{if(event.target.closest('.skip-link')){event.preventDefault();app.focus();return;}const el=event.target.closest('[data-action]');if(el&&!el.disabled&&actions[el.dataset.action])actions[el.dataset.action](el);});
 document.addEventListener('change',event=>{if(event.target.matches('input[name="ingredient"]')){state.selected=Number(event.target.value);render();document.querySelector('input[name="ingredient"][value="'+state.selected+'"]').focus({preventScroll:true});}});
 document.addEventListener('input',event=>{if(event.target.id==='response')state.response=event.target.value;});
+document.querySelector('#account').addEventListener('click',()=>signIn());
+document.addEventListener('change',event=>{if(event.target.id==='journal-month'&&/^\d{4}-\d{2}$/.test(event.target.value)){state.journalMonth=event.target.value;render();}});
 document.querySelector('#reset').addEventListener('click',reset);
 document.querySelector('#close-dialog').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('close',()=>{const target=dialog.returnFocus;if(target?.isConnected)target.focus({preventScroll:true});});

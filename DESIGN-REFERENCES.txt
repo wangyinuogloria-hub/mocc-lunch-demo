@@ -7,3 +7,8 @@ https://developer.apple.com/design/human-interface-guidelines/
 
 Uses local system fonts, original inline line icons, and the project's green accent.
 No Apple fonts, SF Symbols, logos or externally loaded UI libraries are distributed.
+
+Ingredient pictograms generated with built-in image_gen from the supplied lunch photograph.
+Asset: assets/ingredient-icons.png
+Prompt: assets/ingredient-icons-prompt.txt
+Lunchbook: local demo profiles and device storage; no cloud authentication or measured carbon score.
